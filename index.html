@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todos App</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>📝Notifi</h1>
+            <p class="subtitle">Organize your tasks efficiently</p>
+        </header>
+
+        <div class="add-todo-section">
+            <form class="add-todo" id="addTodoForm">
+                <input 
+                    type="text"
+                    class="todo-input"
+                    id="todo-input"
+                    placeholder="What needs to be done?"
+                    required
+                >
+                <button type="submit" class="add-btn">Add Todo</button>
+            </form>
+        </div>
+
+        <div class="columns">
+            <div class="column">
+                <div class="column-header todos-header">
+                    📋 Todos (<span id="todosCount">0</span>)
+                </div>
+                <div class="todo-list" id="todosList">
+                    <div class="empty-state">No todos yet. Add one above!</div>
+                </div>
+            </div>
+
+            <div class="column">
+                <div class="column-header in-progress-header">
+                    ⏳ In Progress (<span id="inProgressCount">0</span>)
+                </div>
+                <div class="todo-list" id="inProgressList">
+                    <div class="empty-state">No tasks in progress</div>
+                </div>
+            </div>
+
+            <div class="column">
+                <div class="column-header completed-header">
+                    ✅ Completed (<span id="completedCount">0</span>)
+                </div>
+                <div class="todo-list" id="completedList">
+                    <div class="empty-state">No completed tasks</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+<script src="client.js"></script>
+</html>
