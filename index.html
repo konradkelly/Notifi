@@ -10,53 +10,89 @@
 <body>
     <div class="container">
         <header>
-            <h1 style="display: flex; align-items: center; justify-content: center;"><svg width="32" height="32" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px; vertical-align: middle;"><defs><radialGradient id="flowerGradient"><stop offset="10%" stop-color="pink" /><stop offset="95%" stop-color="white" /></radialGradient></defs><path d="M20,90 C40,70 60,70 80,90 L50,100 Z" fill="green"/><path d="M50,20 C10,50 10,70 50,85 C90,70 90,50 50,20 Z" fill="url(#flowerGradient)" stroke="gray" stroke-width="1"/><circle cx="50" cy="20" r="3" fill="yellow" /></svg>Notifi<svg width="32" height="32" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="margin-left: 8px; vertical-align: middle;"><path d="M20,90 C40,70 60,70 80,90 L50,100 Z" fill="green"/><path d="M50,20 C10,50 10,70 50,85 C90,70 90,50 50,20 Z" fill="url(#flowerGradient)" stroke="gray" stroke-width="1"/><circle cx="50" cy="20" r="3" fill="yellow" /></svg></h1>
+            <div class="header-container">
+                <h1><svg width="32" height="32" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px; vertical-align: middle;"><defs><radialGradient id="flowerGradient"><stop offset="10%" stop-color="pink" /><stop offset="95%" stop-color="white" /></radialGradient></defs><path d="M20,90 C40,70 60,70 80,90 L50,100 Z" fill="green"/><path d="M50,20 C10,50 10,70 50,85 C90,70 90,50 50,20 Z" fill="url(#flowerGradient)" stroke="gray" stroke-width="1"/><circle cx="50" cy="20" r="3" fill="yellow" /></svg>Notifi<svg width="32" height="32" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="margin-left: 8px; vertical-align: middle;"><path d="M20,90 C40,70 60,70 80,90 L50,100 Z" fill="green"/><path d="M50,20 C10,50 10,70 50,85 C90,70 90,50 50,20 Z" fill="url(#flowerGradient)" stroke="gray" stroke-width="1"/><circle cx="50" cy="20" r="3" fill="yellow" /></svg></h1>
+                <button id="logout-btn" class="logout-btn">Logout</button>
+            </div>
             <p class="subtitle">Organize your tasks with ease</p>
         </header>
+        <!-- Authentication Forms -->
+        <div id="auth-container">
+            <div id="login-form-container">
+                <h2>Login</h2>
+                <form id="loginForm">
+                    <input type="text" id="login-username" placeholder="Username" required class="todo-input">
+                    <input type="password" id="login-password" placeholder="Password" required class="todo-input">
+                    <button type="submit" class="add-btn">Login</button>
+                </form>
+                <p>Don't have an account? <a href="#" id="show-register">Register here</a></p>
+            </div>
 
-        <div class="add-todo-section">
-            <form class="add-todo" id="addTodoForm">
-                <input 
-                    type="text"
-                    class="todo-input"
-                    id="todo-input"
-                    placeholder="What needs to be done?"
-                    required
-                >
-                <button type="submit" class="add-btn">Add Todo</button>
-            </form>
+            <div id="register-form-container" style="display: none;">
+                <h2>Register</h2>
+                <form id="registerForm">
+                    <input type="text" id="register-username" placeholder="Username" required class="todo-input">
+                    <input type="password" id="register-password" placeholder="Password" required class="todo-input">
+                    <button type="submit" class="add-btn">Register</button>
+                </form>
+                <p>Already have an account? <a href="#" id="show-login">Login here</a></p>
+            </div>
         </div>
 
-        <div class="columns">
-            <div class="column">
-                <div class="column-header todos-header">
-                    📋 Todos (<span id="todosCount">0</span>)
-                </div>
-                <div class="todo-list" id="todosList">
-                    <div class="empty-state">No todos yet. Add one above!</div>
-                </div>
+        <!-- Main App Content (hidden by default) -->
+        <div id="app-container" style="display: none;">
+
+            <div class="add-todo-section">
+                <form class="add-todo" id="addTodoForm">
+                    <input 
+                        type="text"
+                        class="todo-input"
+                        id="todo-input"
+                        placeholder="What needs to be done?"
+                        required
+                    >
+                    <button type="submit" class="add-btn">Add Todo</button>
+                </form>
             </div>
 
-            <div class="column">
-                <div class="column-header in-progress-header">
-                    ⏳ In Progress (<span id="inProgressCount">0</span>)
+            <div class="columns">
+                <div class="column">
+                    <div class="column-header todos-header">
+                        📋 Todos (<span id="todosCount">0</span>)
+                    </div>
+                    <div class="todo-list" id="todosList">
+                        <div class="empty-state">No todos yet. Add one above!</div>
+                    </div>
                 </div>
-                <div class="todo-list" id="inProgressList">
-                    <div class="empty-state">No tasks in progress</div>
-                </div>
-            </div>
 
-            <div class="column">
-                <div class="column-header completed-header">
-                    ✅ Completed (<span id="completedCount">0</span>)
+                <div class="column">
+                    <div class="column-header in-progress-header">
+                        ⏳ In Progress (<span id="inProgressCount">0</span>)
+                    </div>
+                    <div class="todo-list" id="inProgressList">
+                        <div class="empty-state">No tasks in progress</div>
+                    </div>
                 </div>
-                <div class="todo-list" id="completedList">
-                    <div class="empty-state">No completed tasks</div>
+
+                <div class="column">
+                    <div class="column-header completed-header">
+                        ✅ Completed (<span id="completedCount">0</span>)
+                    </div>
+                    <div class="todo-list" id="completedList">
+                        <div class="empty-state">No completed tasks</div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</body>
 
-<script src="client.js"></script>
+    <script src="client.js"></script>
+    <div id="todo-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2 id="modal-title"></h2>
+            <p id="modal-details"></p>
+        </div>
+    </div>
+</body>
 </html>

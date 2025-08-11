@@ -1,4 +1,4 @@
-        * {
+* {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
@@ -22,10 +22,19 @@
             margin-bottom: 30px;
         }
 
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
         h1 {
             font-size: 2.5rem;
             color: #2c3e50;
             margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .subtitle {
@@ -78,7 +87,7 @@
 
         .add-btn {
             padding: 12px 24px;
-            background: #3498db;
+            background: #27ae60;
             color: white;
             border: none;
             border-radius: 8px;
@@ -88,7 +97,7 @@
         }
 
         .add-btn:hover {
-            background: #2980b9;
+            background: #2ecc71;
         }
 
         .start-btn, .complete-btn, .delete-btn, .back-btn, .restart-btn {
@@ -98,6 +107,27 @@
             font-size: 12px;
             cursor: pointer;
             transition: background-color 0.3s ease;
+        }
+
+        .logout-btn {
+            display: none;
+            padding: 2px 12px;
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            margin-left: 8px;
+        }
+
+        .logout-btn:hover {
+            background: #2ecc71;
+        }
+
+        .logged-in .logout-btn {
+            display: block;
         }
 
         .columns {
@@ -246,3 +276,87 @@
                 flex-direction: column;
             }
         }
+
+#auth-container {
+    width: 300px;
+    height: 400px;
+    margin: 100px auto;
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+#auth-container h2 {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+#auth-container input {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 40px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+}
+
+#auth-container button {
+    width: 100%;
+    padding: 10px;
+    background-color: #007bff;
+    color: #fff;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+#auth-container p {
+    text-align: center;
+    margin-top: 10px;
+}
+
+#auth-container a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+#app-container {
+    display: none;
+}
+
+/* Modal Styles */
+.modal {
+    position: fixed;
+    z-index: 1;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.4);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 15% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    max-width: 500px;
+    border-radius: 10px;
+    position: relative;
+}
+
+.close-btn {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.close-btn:hover,
+.close-btn:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
