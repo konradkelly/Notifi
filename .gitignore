@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+mydb.sql
+todos.sql
+
+# Environment and configuration
+app.yaml
+.env
+.env.local
+.env.production
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.temp

@@ -1,189 +1,310 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
-const bcrypt = require('bcrypt');
+const mysql = require('mysql2/promise');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const bodyParser = require('body-parser');
+const path = require('path');
+const fs = require('fs');
+require('dotenv').config();
 
 const app = express();
-const port = 3000;
-const JWT_SECRET = 'your-super-secret-key'; // Replace with a strong, secret key in a real app
+const port = process.env.PORT || 8081;
 
-// Middleware to parse JSON bodies
-app.use(express.json());
+// Create a new router instance for API routes
+const apiRouter = express.Router();
 
-// Serve static files from the current directory
-app.use(express.static(__dirname));
+// Middleware
+app.use(bodyParser.json());
 
-// Initialize the database
-const db = new sqlite3.Database('./todos.db', (err) => {
-    if (err) {
-        console.error(err.message);
-    }
-    console.log('Connected to the todos database.');
-});
+// Use the API router for all routes starting with /api
+app.use('/api', apiRouter);
 
-// --- AUTHENTICATION ROUTES ---
+// Database connection pool setup
+let pool;
 
-// Register a new user
-app.post('/api/register', async (req, res) => {
-    const { username, password } = req.body;
-    if (!username || !password) {
-        return res.status(400).json({ error: 'Username and password are required' });
-    }
-
+async function setupDatabase() {
     try {
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const sql = `INSERT INTO users (username, password) VALUES (?, ?)`;
-        db.run(sql, [username, hashedPassword], function(err) {
-            if (err) {
-                // Unique constraint violation
-                if (err.code === 'SQLITE_CONSTRAINT') {
-                    return res.status(409).json({ error: 'Username already exists' });
-                }
-                return res.status(500).json({ error: err.message });
-            }
-            res.status(201).json({ message: 'User created successfully', userId: this.lastID });
-        });
-    } catch (error) {
-        res.status(500).json({ error: 'Server error during registration' });
+        let dbConfig;
+
+        // Check if running in a production environment (like App Engine)
+        if (process.env.NODE_ENV === 'production') {
+            // Use a Unix socket for App Engine
+            dbConfig = {
+                user: process.env.DB_USER,
+                password: process.env.DB_PASSWORD,
+                database: process.env.DB_NAME,
+                socketPath: `/cloudsql/${process.env.CLOUD_SQL_CONNECTION_NAME}`,
+                connectionLimit: 10,
+                multipleStatements: true
+            };
+        } else {
+            // Use host/port for local development
+            // This is the source of the ECONNREFUSED error if no local DB is running.
+            // It's not a deployment issue.
+            dbConfig = {
+                user: process.env.DB_USER,
+                password: process.env.DB_PASSWORD,
+                database: process.env.DB_NAME,
+                host: process.env.DB_HOST,
+                connectionLimit: 10,
+                multipleStatements: true
+            };
+        }
+
+        pool = await mysql.createPool(dbConfig);
+        console.log('Connected to Cloud SQL database.');
+        await initializeTables();
+    } catch (err) {
+        console.error('Failed to connect to database or initialize tables:', err);
     }
-});
+}
 
-// Login a user
-app.post('/api/login', (req, res) => {
-    const { username, password } = req.body;
-    if (!username || !password) {
-        return res.status(400).json({ error: 'Username and password are required' });
-    }
+// Alternative approach: Use integer IDs instead of UUIDs
+// Replace the initializeTables function and registration route with these:
 
-    const sql = `SELECT * FROM users WHERE username = ?`;
-    db.get(sql, [username], async (err, user) => {
-        if (err) {
-            return res.status(500).json({ error: err.message });
-        }
-        if (!user) {
-            return res.status(401).json({ error: 'Invalid credentials' });
-        }
+async function initializeTables() {
+    const sql = `
+        CREATE TABLE IF NOT EXISTS users (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            username VARCHAR(255) NOT NULL UNIQUE,
+            password VARCHAR(255) NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS todos (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            text TEXT NOT NULL,
+            status VARCHAR(50) NOT NULL,
+            createdAt DATETIME NOT NULL,
+            user_id INT NOT NULL,
+            details TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+    `;
+    await pool.query(sql);
+    console.log('Tables initialized with integer IDs.');
+}
 
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(401).json({ error: 'Invalid credentials' });
-        }
-
-        const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '1h' });
-        res.json({ message: 'Logged in successfully', token });
-    });
-});
-
-
-// --- AUTHENTICATION MIDDLEWARE ---
+// Authenticate JWT token middleware
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    const token = authHeader && authHeader.split(' ')[1];
+    if (token == null) return res.sendStatus(401);
 
-    if (token == null) {
-        return res.sendStatus(401); // if there's no token
-    }
-
-    jwt.verify(token, JWT_SECRET, (err, user) => {
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
         if (err) {
-            return res.sendStatus(403); // if the token is no longer valid
+            console.error('JWT verification error:', err);
+            return res.sendStatus(403);
         }
         req.user = user;
         next();
     });
 };
 
-
-// --- PROTECTED TODO ROUTES ---
-
-// GET all todos for the logged-in user
-app.get('/api/todos', authenticateToken, (req, res) => {
-    const userId = req.user.id;
-    db.all("SELECT * FROM todos WHERE user_id = ? ORDER BY createdAt DESC", [userId], (err, rows) => {
-        if (err) {
-            return res.status(500).json({ error: err.message });
+// Updated registration route (remove the uuid import and generation)
+apiRouter.post('/register', async (req, res) => {
+    const { username, password } = req.body;
+    console.log('Registration attempt for username:', username);
+    
+    if (!username || !password) {
+        console.log('Missing username or password');
+        return res.status(400).json({ error: 'Username and password are required.' });
+    }
+    
+    if (username.length < 3) {
+        console.log('Username too short:', username);
+        return res.status(400).json({ error: 'Username must be at least 3 characters long.' });
+    }
+    
+    if (password.length < 6) {
+        console.log('Password too short for user:', username);
+        return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+    }
+    
+    try {
+        // Check if username already exists first
+        console.log('Checking if username exists:', username);
+        const [existingUsers] = await pool.query('SELECT id FROM users WHERE username = ?', [username]);
+        if (existingUsers.length > 0) {
+            console.log('Username already exists:', username);
+            return res.status(409).json({ error: 'Username already exists.' });
         }
+        
+        console.log('Creating new user:', username);
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+        
+        // Remove the userId = uuidv4() line, let MySQL auto-increment the ID
+        const [result] = await pool.query('INSERT INTO users (username, password) VALUES (?, ?)', [username, hashedPassword]);
+        console.log('User created successfully:', username, 'with ID:', result.insertId);
+        
+        res.status(201).json({ message: 'User registered successfully.' });
+    } catch (err) {
+        console.error('Registration error for user:', username, 'Error:', err);
+        
+        if (err.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({ error: 'Username already exists.' });
+        }
+        
+        res.status(500).json({ error: 'Registration failed. Please try again.' });
+    }
+});
+
+apiRouter.post('/login', async (req, res) => {
+    const { username, password } = req.body;
+    if (!username || !password) {
+        return res.status(400).json({ error: 'Username and password are required.' });
+    }
+    try {
+        const [rows] = await pool.query('SELECT * FROM users WHERE username = ?', [username]);
+        if (rows.length === 0) return res.status(400).json({ error: 'Invalid username or password.' });
+
+        const user = rows[0];
+        const validPassword = await bcrypt.compare(password, user.password);
+        if (!validPassword) return res.status(400).json({ error: 'Invalid username or password.' });
+
+        const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        res.json({ token });
+    } catch (err) {
+        console.error('Login error:', err);
+        res.status(500).json({ error: 'Login failed.' });
+    }
+});
+
+// --- Todo Routes using apiRouter (FIXED) ---
+apiRouter.get('/todos', authenticateToken, async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM todos WHERE user_id = ? ORDER BY createdAt DESC', [req.user.id]);
         res.json(rows);
-    });
-});
-
-// POST a new todo for the logged-in user
-app.post('/api/todos', authenticateToken, (req, res) => {
-    const { text, status, createdAt, details } = req.body;
-    const userId = req.user.id;
-
-    if (!text || !status || !createdAt) {
-        return res.status(400).json({ error: 'Missing required fields' });
+    } catch (err) {
+        console.error('Get todos error:', err);
+        res.status(500).json({ error: 'Failed to retrieve todos.' });
     }
-    const sql = `INSERT INTO todos (text, status, createdAt, user_id, details) VALUES (?, ?, ?, ?, ?)`;
-    db.run(sql, [text, status, createdAt, userId, details], function(err) {
-        if (err) {
-            return res.status(500).json({ error: err.message });
-        }
-        res.status(201).json({ id: this.lastID, text, status, createdAt, details });
-    });
 });
 
-// PUT (update) a todo's status or text for the logged-in user
-app.put('/api/todos/:id', authenticateToken, (req, res) => {
+apiRouter.post('/todos', authenticateToken, async (req, res) => {
+    const { text, details } = req.body;
+    
+    if (!text || text.trim().length === 0) {
+        return res.status(400).json({ error: 'Todo text is required.' });
+    }
+    
+    // FIXED: Changed from 'pending' to 'todo' to match client expectations
+    const status = 'todo';
+
+    // FIX: Correctly format the date for MySQL DATETIME
+    const now = new Date();
+    const mysqlFormattedDate = now.toISOString().slice(0, 19).replace('T', ' ');
+
+    try {
+        const [result] = await pool.query(
+            'INSERT INTO todos (text, status, createdAt, user_id, details) VALUES (?, ?, ?, ?, ?)',
+            [text, status, mysqlFormattedDate, req.user.id, details || 'Click to add details']
+        );
+        
+        const newTodo = {
+            id: result.insertId,
+            text,
+            status,
+            createdAt: mysqlFormattedDate,
+            user_id: req.user.id,
+            details: details || 'Click to add details'
+        };
+        
+        res.status(201).json(newTodo);
+    } catch (err) {
+        console.error('Create todo error:', err);
+        res.status(500).json({ error: 'Failed to create todo.' });
+    }
+});
+
+// FIXED: Updated PUT route to handle partial updates properly
+apiRouter.put('/todos/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
     const { text, status, details } = req.body;
-    const { id } = req.params;
-    const userId = req.user.id;
-
-    if (!text && !status && !details) {
-        return res.status(400).json({ error: 'No fields to update' });
+    
+    // Build the update query dynamically based on what fields are provided
+    const updateFields = [];
+    const values = [];
+    
+    if (text !== undefined) {
+        updateFields.push('text = ?');
+        values.push(text);
     }
-
-    let updates = [];
-    let params = [];
-
-    if (text) {
-        updates.push('text = ?');
-        params.push(text);
+    if (status !== undefined) {
+        updateFields.push('status = ?');
+        values.push(status);
     }
-    if (status) {
-        updates.push('status = ?');
-        params.push(status);
+    if (details !== undefined) {
+        updateFields.push('details = ?');
+        values.push(details);
     }
-    if (details) {
-        updates.push('details = ?');
-        params.push(details);
+    
+    if (updateFields.length === 0) {
+        return res.status(400).json({ error: 'No fields to update.' });
     }
-
-    params.push(id, userId);
-
-    const sql = `UPDATE todos SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`;
-
-    db.run(sql, params, function(err) {
-        if (err) {
-            return res.status(500).json({ error: err.message });
+    
+    values.push(id, req.user.id); // Add id and user_id for WHERE clause
+    
+    try {
+        const [result] = await pool.query(
+            `UPDATE todos SET ${updateFields.join(', ')} WHERE id = ? AND user_id = ?`,
+            values
+        );
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Todo not found or you do not have permission to update it.' });
         }
-        if (this.changes === 0) {
-            return res.status(404).json({ error: 'Todo not found or you do not have permission to update it' });
-        }
-        res.json({ message: 'Todo updated successfully' });
-    });
+        
+        res.status(200).json({ message: 'Todo updated successfully.' });
+    } catch (err) {
+        console.error('Update todo error:', err);
+        res.status(500).json({ error: 'Failed to update todo.' });
+    }
 });
 
-// DELETE a todo for the logged-in user
-app.delete('/api/todos/:id', authenticateToken, (req, res) => {
+apiRouter.delete('/todos/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
-    const userId = req.user.id;
-    const sql = 'DELETE FROM todos WHERE id = ? AND user_id = ?';
-
-    db.run(sql, [id, userId], function(err) {
-        if (err) {
-            return res.status(500).json({ error: err.message });
+    try {
+        const [result] = await pool.query('DELETE FROM todos WHERE id = ? AND user_id = ?', [id, req.user.id]);
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Todo not found or you do not have permission to delete it.' });
         }
-        if (this.changes === 0) {
-            return res.status(404).json({ error: 'Todo not found or you do not have permission to delete it' });
-        }
-        res.json({ message: 'Todo deleted successfully' });
-    });
+        
+        res.status(200).json({ message: 'Todo deleted successfully.' });
+    } catch (err) {
+        console.error('Delete todo error:', err);
+        res.status(500).json({ error: 'Failed to delete todo.' });
+    }
 });
 
+// Health check endpoint
+apiRouter.get('/health', async (req, res) => {
+    try {
+        await pool.query('SELECT 1');
+        res.json({ status: 'healthy', database: 'connected', timestamp: new Date().toISOString() });
+    } catch (error) {
+        console.error('Health check failed:', error);
+        res.status(503).json({ status: 'unhealthy', database: 'disconnected', timestamp: new Date().toISOString() });
+    }
+});
+
+// Serve static files from the root directory
+app.use(express.static(__dirname));
+
+// Catch-all route to serve the index.html for any other requests
+app.get('*', (req, res) => {
+    const filePath = path.join(__dirname, 'index.html');
+    fs.promises.access(filePath, fs.constants.F_OK)
+        .then(() => {
+            res.sendFile(filePath);
+        })
+        .catch(() => {
+            console.error('Error: index.html not found in the root directory.');
+            res.status(404).send('Not Found');
+        });
+});
 
 app.listen(port, () => {
-    console.log(`Server running at http://localhost:${port}`);
+    console.log(`Server running on port ${port}`);
+    setupDatabase();
 });
