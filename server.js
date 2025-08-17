@@ -26,7 +26,7 @@ async function setupDatabase() {
     try {
         let dbConfig;
 
-        // Check if running in a production environment (like App Engine)
+        // Check if running in a production environment (eg. App Engine)
         if (process.env.NODE_ENV === 'production') {
             // Use a Unix socket for App Engine
             dbConfig = {
@@ -46,17 +46,30 @@ async function setupDatabase() {
                 password: process.env.DB_PASSWORD,
                 database: process.env.DB_NAME,
                 host: process.env.DB_HOST,
+                port: process.env.DB_PORT || 3306, // Default MySQL port
                 connectionLimit: 10,
                 multipleStatements: true
             };
         }
 
         pool = await mysql.createPool(dbConfig);
-        console.log('Connected to Cloud SQL database.');
+        
+        try {
+            const connection = await pool.getConnection();
+            await connection.ping();
+            connection.release();
+            console.log('Connected to Cloud SQL database.');
+        } catch (err) {
+            console.error('Database health check failed:', err);
+            throw err;
+        }
+
         await initializeTables();
-    } catch (err) {
-        console.error('Failed to connect to database or initialize tables:', err);
-    }
+        
+        } catch (err) {
+            console.error('Failed to connect to database or initialize tables:', err);
+            throw err;
+        }
 }
 
 // Alternative approach: Use integer IDs instead of UUIDs
