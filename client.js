@@ -31,8 +31,16 @@ class TodosApp {
         this.modalDetails = document.getElementById('modal-details');
         this.closeBtn = document.querySelector('.close-btn');
 
+        // --- Password Change elements ---
+    this.passwordChangeModal = document.getElementById('password-change-modal');
+    this.passwordChangeForm = document.getElementById('password-change-form');
+    this.newPasswordInput = document.getElementById('new-password');
+    this.passwordChangeSuccessModal = document.getElementById('password-change-success-modal');
+    this.passwordChangeSuccessOkBtn = document.getElementById('password-change-success-ok-btn');
+
         // --- App state ---
         this.token = null;
+        this.tempToken = null;
         this.todos = [];
 
         // Initialize the application
@@ -55,6 +63,10 @@ class TodosApp {
 
         // Modal event listeners
         if (this.closeBtn) this.closeBtn.addEventListener('click', () => this.hideTodoModal());
+        if (this.passwordChangeForm) this.passwordChangeForm.addEventListener('submit', (e) => this.handleChangePassword(e));
+        if (this.passwordChangeSuccessOkBtn) {
+            this.passwordChangeSuccessOkBtn.addEventListener('click', () => this.hidePasswordChangeSuccessModal());
+}
         if (this.todoModal) {
             window.addEventListener('click', (e) => {
                 if (e.target === this.todoModal) {
@@ -68,6 +80,75 @@ class TodosApp {
             await this.loadTodos();
         } else {
             this.updateUI();
+        }
+    }
+async handleChangePassword(e) {
+    console.log('Handling password change');
+    e.preventDefault();
+    const newPassword = this.newPasswordInput ? this.newPasswordInput.value.trim() : '';
+    const tokenToUse = this.tempToken || this.token;
+    
+    if (newPassword.length < 8) {
+        alert('Password must be at least 8 characters long.');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/change-password', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${tokenToUse}`
+            },
+            body: JSON.stringify({ password: newPassword })
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            
+            // Store the new token if provided
+            if (data.token) {
+                localStorage.setItem('token', data.token);
+                this.token = data.token;
+                console.log('New token received and stored');
+            }
+            
+            // Hide password change modal and show success
+            if (this.passwordChangeModal) this.passwordChangeModal.style.display = 'none';
+            if (this.passwordChangeSuccessModal) this.passwordChangeSuccessModal.style.display = 'block';
+            if (this.passwordChangeForm) this.passwordChangeForm.reset();
+            
+            // Clear tempToken after use
+            this.tempToken = null;
+        } else {
+            const errorData = await response.json();
+            alert(`Failed to change password: ${errorData.error || 'Unknown error'}`);
+        }
+    } catch (error) {
+        console.error('Failed to change password:', error);
+        alert('An error occurred while changing the password.');
+    }
+}
+
+// 3. Your hidePasswordChangeSuccessModal method is correct:
+hidePasswordChangeSuccessModal() {
+    if (this.passwordChangeSuccessModal) {
+        this.passwordChangeSuccessModal.style.display = 'none';
+    }
+    // Ensure the user stays logged in and can continue using the app
+    this.updateUI();
+    this.loadTodos();
+}
+
+    showPasswordChangeModal() {
+        if (this.passwordChangeModal) {
+            if (this.passwordChangeForm) this.passwordChangeForm.reset();
+            this.passwordChangeModal.style.display = 'block';
+            if (this.appContainer) this.appContainer.style.display = 'block'; // Ensure app container is visible
+            if (this.newPasswordInput) {
+                this.newPasswordInput.style.display = 'block';
+                this.newPasswordInput.focus();
+            }
         }
     }
 
@@ -91,34 +172,48 @@ class TodosApp {
     }
 
     // --- Authentication Handlers ---
-    async handleLogin(e) {
-        e.preventDefault();
-        const username = document.getElementById('login-username').value.trim();
-        const password = document.getElementById('login-password').value.trim();
+async handleLogin(e) {
+    e.preventDefault();
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value.trim();
 
-        try {
-            const response = await fetch('/api/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
-            });
+    try {
+        const response = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
 
-            if (!response.ok) {
-                const errorData = await response.json();
+        console.log('Login response status:', response.status); // Fixed debug log
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.log('Login error data:', errorData); // Moved debug log here
+            
+            if (errorData.passwordExpired && errorData.tempToken) {
+                this.tempToken = errorData.tempToken; // Store the temporary token
+                this.showPasswordChangeModal();
+            } else {
                 alert(`Login failed: ${errorData.error || 'Unknown error'}`);
-                return;
             }
-
-            const { token } = await response.json();
-            localStorage.setItem('token', token);
-            this.token = token;
-            this.updateUI();
-            this.loadTodos();
-        } catch (error) {
-            console.error('Login failed:', error);
-            alert('An error occurred during login.');
+            return;
         }
+
+        // Success case
+        const data = await response.json(); // This should be 'data', not destructured
+        const { token } = data; // Extract token from data
+        
+        localStorage.setItem('token', token);
+        this.token = token;
+        this.updateUI();
+        await this.loadTodos(); // Added await for consistency
+        
+    } catch (error) {
+        console.error('Login failed:', error);
+        alert('An error occurred during login.');
     }
+}
+
 
 // Replace your handleRegister method in client.js with this improved version:
 
@@ -409,11 +504,13 @@ async handleRegister(e) {
         }
     }
 
+
     hideTodoModal() {
         this.todoModal.style.display = 'none';
         // Remove the todo ID from the dataset
         this.modalDetails.dataset.todoId = '';
     }
+
 
     // Main rendering logic to update the todo lists and counts
     render() {
