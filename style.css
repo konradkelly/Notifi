@@ -347,6 +347,33 @@
     position: relative;
 }
 
+    /* Password Change Modal */
+    #password-change-modal .modal-content,
+    #password-change-success-modal .modal-content {
+        width: 400px;       /* Bigger width */
+        max-width: 90%;     /* Responsive on small screens */
+        padding: 30px;      /* More padding */
+        border-radius: 12px; /* Slightly rounded corners */
+        box-shadow: 0 8px 20px rgba(0,0,0,0.3); /* Subtle shadow */
+    }
+
+    /* Center modal vertically */
+    #password-change-modal,
+    #password-change-success-modal {
+        display: none; /* default hidden */
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1000; /* on top of everything */
+        background-color: rgba(0,0,0,0.4); /* semi-transparent background */
+    }
+
+    /* Disable background scrolling while modal is open */
+    body.modal-open {
+        overflow: hidden;
+    }
+
 .close-btn {
     color: #aaa;
     float: right;

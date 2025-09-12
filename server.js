@@ -180,62 +180,73 @@ apiRouter.post('/register', async (req, res) => {
 apiRouter.post('/login', async (req, res) => {
     const { username, password } = req.body;
     console.log('Login attempt for username:', username);
-    
+
     if (!username || !password) {
         return res.status(400).json({ error: 'Username and password are required.' });
     }
-    
+
     try {
-        const [rows] = await pool.query('SELECT * FROM users WHERE username = ?', [username]);
+        const [rows] = await pool.query(
+            `SELECT *,
+                    (passwordChangedAt < DATE_SUB(NOW(), INTERVAL 30 DAY)) AS passwordExpired,
+                    forcePasswordReset,
+                    CHAR_LENGTH(password) AS passwordLength
+             FROM users
+             WHERE username = ?`,
+            [username]
+        );
+
         if (rows.length === 0) {
             console.log('User not found:', username);
             return res.status(400).json({ error: 'Invalid username or password.' });
         }
 
         const user = rows[0];
+
+        // Automatically flag users with short passwords
+        if (user.passwordLength < 60 && !user.forcePasswordReset) {
+            console.log(`User ${username} has short password, flagging for reset.`);
+            await pool.query(
+                'UPDATE users SET forcePasswordReset = TRUE WHERE id = ?',
+                [user.id]
+            );
+            user.forcePasswordReset = true; // Update local object
+        }
+
+        // Verify password
         const validPassword = await bcrypt.compare(password, user.password);
         if (!validPassword) {
             console.log('Invalid password for user:', username);
             return res.status(400).json({ error: 'Invalid username or password.' });
         }
 
-        console.log('Password valid for user:', username);
-        console.log('User passwordChangedAt:', user.passwordChangedAt);
-
-        // Check password expiry
-        if (user.passwordChangedAt) {
-            const passwordChangedAt = new Date(user.passwordChangedAt);
-            const now = new Date();
-            const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000;
-            
-            console.log('Password age in days:', (now - passwordChangedAt) / (24 * 60 * 60 * 1000));
-            
-            if (now - passwordChangedAt > thirtyDaysInMs) {
-                console.log('Password expired for user:', username);
-                const tempToken = jwt.sign({ id: user.id, passwordExpired: true }, process.env.JWT_SECRET, { expiresIn: '5m' });
-                return res.status(401).json({ 
-                    error: 'Password has expired. Please change your password.', 
-                    passwordExpired: true, 
-                    tempToken: tempToken 
-                });
-            }
-        } else {
-            // If passwordChangedAt is null, this might be an old user - update it to current time
-            console.log('No passwordChangedAt found for user, updating:', username);
-            const now = new Date();
-            const mysqlFormattedDate = now.toISOString().slice(0, 19).replace('T', ' ');
-            await pool.query('UPDATE users SET passwordChangedAt = ? WHERE id = ?', [mysqlFormattedDate, user.id]);
+        // Enforce password reset if flagged or expired
+        if (user.forcePasswordReset || user.passwordExpired) {
+            console.log('Password reset required for user:', username);
+            const tempToken = jwt.sign(
+                { id: user.id, passwordExpired: true },
+                process.env.JWT_SECRET,
+                { expiresIn: '5m' }
+            );
+            return res.status(401).json({
+                error: 'Password must be reset before logging in.',
+                passwordExpired: true,
+                tempToken
+            });
         }
 
-        console.log('Creating token for user:', username);
+        // Issue regular JWT token
         const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
         res.json({ token });
-        
+
     } catch (err) {
         console.error('Login error:', err);
         res.status(500).json({ error: 'Login failed.' });
     }
 });
+
+
+
 
 apiRouter.post('/change-password', authenticateOrRenewToken, async (req, res) => {
     const { password } = req.body;
@@ -248,7 +259,11 @@ apiRouter.post('/change-password', authenticateOrRenewToken, async (req, res) =>
         const now = new Date();
         const mysqlFormattedDate = now.toISOString().slice(0, 19).replace('T', ' ');
 
-        await pool.query('UPDATE users SET password = ?, passwordChangedAt = ? WHERE id = ?', [hashedPassword, mysqlFormattedDate, req.user.id]);
+        await pool.query(
+        'UPDATE users SET password = ?, passwordChangedAt = ?, forcePasswordReset = FALSE WHERE id = ?',
+        [hashedPassword, mysqlFormattedDate, req.user.id]
+        );
+
         
         // Issue a new regular token after successful password change
         const newToken = jwt.sign({ id: req.user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });

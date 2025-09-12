@@ -42,26 +42,6 @@
         <!-- Main App Content (hidden by default) -->
         <div id="app-container" style="display: none;">
 
-        <div id="password-change-modal" class="modal">
-            <div class="modal-content">
-                <span class="close-btn">&times;</span>
-                <h2>Change Password</h2>
-                <p>Your password has expired. Please enter a new password.</p>
-                <form id="password-change-form">
-                    <input type="password" id="new-password" placeholder="New Password (min 8 characters)" required>
-                    <button type="submit">Change Password</button>
-                </form>
-            </div>
-        </div>
-
-        <div id="password-change-success-modal" class="modal">
-            <div class="modal-content">
-                <h2>Password Changed Successfully</h2>
-                <p>Your password has been updated. You can continue using the app.</p>
-                <button id="password-change-success-ok-btn">Continue</button>
-            </div>
-        </div>
-
             <div class="add-todo-section">
                 <form class="add-todo" id="addTodoForm">
                     <input 
@@ -114,5 +94,27 @@
             <p id="modal-details"></p>
         </div>
     </div>
-</body>
+
+            <!-- Password Change Modal -->
+        <div id="password-change-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>Change Your Password</h2>
+            <form id="password-change-form">
+            <label for="new-password">New Password:</label>
+            <input type="password" id="new-password" required minlength="8" />
+            <button type="submit">Change Password</button>
+            </form>
+        </div>
+        </div>
+
+        <!-- Password Change Success Modal -->
+        <div id="password-change-success-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <h2>Password Changed Successfully!</h2>
+            <button id="password-change-success-ok-btn">OK</button>
+        </div>
+        </div>
+
+    </body>
 </html>

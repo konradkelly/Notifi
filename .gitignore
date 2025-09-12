@@ -36,3 +36,9 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Ignore specific JS files
+generateHash.js
+migrateSQLitetoMySQL.js
+migrateShortPasswords.js
+flagFromSQLite.js
