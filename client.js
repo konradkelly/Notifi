@@ -52,6 +52,24 @@ class TodosApp {
             this.passwordChangeSuccessOkBtn.addEventListener('click', () => this.hidePasswordChangeSuccessModal());
         }
 
+        // Password-reset modal: where username is required before a password change
+        this.showResetLink = document.getElementById('show-reset');
+        this.passwordResetModal = document.getElementById('password-reset-modal');
+        this.passwordResetForm = document.getElementById('password-reset-form');
+        this.resetUsernameInput = document.getElementById('reset-username');
+
+        if (this.showResetLink) {
+            this.showResetLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.showPasswordResetModal();
+            });
+        }
+
+        if (this.passwordResetForm) {
+            this.passwordResetForm.addEventListener('submit', (e) => this.handlePasswordResetRequest(e));
+        }
+
+
         // --- Window click to close modals ---
         window.addEventListener('click', (e) => {
             if (e.target === this.todoModal) this.hideTodoModal();
@@ -185,6 +203,57 @@ class TodosApp {
         } else {
             this.authContainer.style.display = 'block';
             this.appContainer.style.display = 'none';
+        }
+    }
+
+    async handlePasswordResetRequest(e) {
+        e.preventDefault();
+        const username = this.resetUsernameInput.value.trim();
+
+        if (!username) {
+            alert('Please enter a valid username.');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/request-password-reset', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username })
+            });
+
+            if (!response.ok) {
+            const errorData = await response.json();
+            alert(`Reset request failed: ${errorData.error || 'Unknown error'}`);
+            return;
+            }
+
+            const data = await response.json();
+
+            if (data.tempToken) {
+            this.tempToken = data.tempToken;
+            this.hidePasswordResetModal();
+            this.showPasswordChangeModal();
+            } else {
+            alert('Unexpected response from server.');
+            }
+        } catch (error) {
+            console.error('Password reset request failed:', error);
+            alert('An error occurred while requesting password reset.');
+        }
+    }
+
+    showPasswordResetModal() {
+        if (this.passwordResetModal) {
+            this.passwordResetForm.reset();
+            this.passwordResetModal.style.display = 'block';
+            setTimeout(() => this.resetUsernameInput.focus(), 50);
+        }
+    }
+
+    hidePasswordResetModal() {
+        if (this.passwordResetModal) {
+            this.passwordResetModal.style.display = 'none';
         }
     }
 

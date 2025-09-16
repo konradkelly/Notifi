@@ -245,6 +245,38 @@ apiRouter.post('/login', async (req, res) => {
     }
 });
 
+apiRouter.post('/request-password-reset', async (req, res) => {
+    const { username } = req.body;
+
+    if (!username) {
+        return res.status(400).json({ error: 'Username is required.' });
+    }
+
+    try {
+        // Look up the user by username
+        const [rows] = await pool.query('SELECT id FROM users WHERE username = ?', [username]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+
+        const user = rows[0];
+
+        // Generate a short-lived JWT (like your login reset flow)
+        const tempToken = jwt.sign(
+            { id: user.id, passwordExpired: true },
+            process.env.JWT_SECRET,
+            { expiresIn: '5m' }
+        );
+
+        // Respond with the token
+        res.json({ tempToken });
+
+    } catch (err) {
+        console.error('Password reset request error:', err);
+        res.status(500).json({ error: 'Failed to process password reset request.' });
+    }
+});
 
 
 
