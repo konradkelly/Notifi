@@ -38,19 +38,38 @@ class TodosApp {
         this.passwordChangeSuccessOkBtn = document.getElementById('password-change-success-ok-btn');
 
         // --- Close buttons ---
-        if (this.todoModal) {
-            const todoCloseBtn = this.todoModal.querySelector('.close-btn');
-            if (todoCloseBtn) todoCloseBtn.addEventListener('click', () => this.hideTodoModal());
-        }
+        // Add inside TodosApp constructor after defining your modals
+        this.modals = document.querySelectorAll('.modal');
 
-        if (this.passwordChangeModal) {
-            const passwordCloseBtn = this.passwordChangeModal.querySelector('.close-btn');
-            if (passwordCloseBtn) passwordCloseBtn.addEventListener('click', () => this.passwordChangeModal.style.display = 'none');
-        }
+        // Attach close button and special ok button listeners
+        this.modals.forEach(modal => {
+            const closeBtn = modal.querySelector('.close-btn');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => {
+                    modal.style.display = 'none';
+                });
+            }
 
-        if (this.passwordChangeSuccessOkBtn) {
-            this.passwordChangeSuccessOkBtn.addEventListener('click', () => this.hidePasswordChangeSuccessModal());
-        }
+            // Special case: if modal has the "OK" button
+            const okBtn = modal.querySelector('#password-change-success-ok-btn');
+            if (okBtn) {
+                okBtn.addEventListener('click', () => {
+                    modal.style.display = 'none';
+                });
+            }
+        });
+
+        // Close when clicking outside
+        window.addEventListener('click', (e) => {
+            this.modals.forEach(modal => {
+                if (e.target === modal) {
+                    modal.style.display = 'none';
+                }
+            });
+        });
+
+
+
 
         // Password-reset modal: where username is required before a password change
         this.showResetLink = document.getElementById('show-reset');
