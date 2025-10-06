@@ -46,7 +46,7 @@ async function setupDatabase() {
     try {
         let dbConfig;
 
-        // Check if running in a production environment (eg. App Engine)
+        // Check if running in a production environment (eg. Google Cloud App Engine)
         if (process.env.NODE_ENV === 'production') {
             // Use a Unix socket for App Engine
             dbConfig = {
@@ -71,12 +71,21 @@ async function setupDatabase() {
         }
 
         pool = await mysql.createPool(dbConfig);
-        
+
+        // Simple health check to verify connection to App Engine or local MySQL     
         try {
             const connection = await pool.getConnection();
             await connection.ping();
             connection.release();
-            console.log('Connected to Cloud SQL database.');
+            try {
+                const hostInfo = (process.env.NODE_ENV === 'production')
+                    ? `Cloud SQL socket ${process.env.CLOUD_SQL_CONNECTION_NAME || '<unknown>'}`
+                    : `MySQL at ${dbConfig.host || 'localhost'}:${dbConfig.port || 3306}`;
+                console.log(`Connected to database (${hostInfo}).`);
+            } catch (logErr) {
+                // Fallback to a simple message if something goes wrong while building the message
+                console.log('Connected to database.');
+            }
         } catch (err) {
             console.error('Database health check failed:', err);
             throw err;
