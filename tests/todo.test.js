@@ -143,6 +143,7 @@ describe('Todo Routes', () => {
         });
 
         test('should return 404 when todo not found', async () => {
+            // Simulate DB update returning affectedRows: 0 to indicate nothing was updated            
             mockPool.query.mockResolvedValue([{ affectedRows: 0 }]);
 
             const response = await request(app)
@@ -153,6 +154,23 @@ describe('Todo Routes', () => {
             expect(response.body).toEqual({ 
                 error: 'Todo not found or you do not have permission to update it.' 
             });
+        });
+
+        test('should return 200 when the text of a todo is successfully updated', async () => {
+            mockPool.query.mockResolvedValue([{ affectedRows: 1 }]);
+
+            const response = await request(app)
+                .put('/api/todos/1')
+                .send({ text: 'Updated text' });
+
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual({ 
+                message: 'Todo updated successfully.'
+            });
+            expect(mockPool.query).toHaveBeenCalledWith(
+                expect.stringContaining('UPDATE todos SET'),
+                ['Updated text', '1', 1]
+            );
         });
 
         test('should handle database errors during update', async () => {
