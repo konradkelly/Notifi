@@ -42,7 +42,7 @@ describe('Todo Routes', () => {
     });
 
     describe('GET /api/todos', () => {
-        it('should return all todos for authenticated user', async () => {
+        test('should return all todos for authenticated user', async () => {
             const mockTodos = [
                 { id: 1, text: 'Test todo 1', status: 'todo', user_id: 1, createdAt: '2025-01-01 12:00:00' },
                 { id: 2, text: 'Test todo 2', status: 'done', user_id: 1, createdAt: '2025-01-02 12:00:00' }
@@ -60,7 +60,7 @@ describe('Todo Routes', () => {
             );
         });
 
-        it('should return empty array when user has no todos', async () => {
+        test('should return empty array when user has no todos', async () => {
             mockPool.query.mockResolvedValue([[]]);
 
             const response = await request(app).get('/api/todos');
@@ -69,7 +69,7 @@ describe('Todo Routes', () => {
             expect(response.body).toEqual([]);
         });
 
-        it('should handle database errors', async () => {
+        test('should handle database errors', async () => {
             mockPool.query.mockRejectedValue(new Error('Database error'));
 
             const response = await request(app).get('/api/todos');
@@ -77,5 +77,94 @@ describe('Todo Routes', () => {
             expect(response.status).toBe(500);
             expect(response.body).toEqual({ error: 'Failed to retrieve todos.' });
         });
+        
+        describe('PUT /api/todos/:id', () => {
+        test('should update todo text', async () => {
+            mockPool.query.mockResolvedValue([{ affectedRows: 1 }]);
+
+            const response = await request(app)
+                .put('/api/todos/1')
+                .send({ text: 'Updated text' });
+
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual({ message: 'Todo updated successfully.' });
+            expect(mockPool.query).toHaveBeenCalledWith(
+                'UPDATE todos SET text = ? WHERE id = ? AND user_id = ?',
+                ['Updated text', '1', 1]
+            );
+        });
+        
+        test('should update todo status', async () => {
+            mockPool.query.mockResolvedValue([{ affectedRows: 1 }]);
+
+            const response = await request(app)
+                .put('/api/todos/1')
+                .send({ status: 'done' });
+
+            expect(response.status).toBe(200);
+            expect(mockPool.query).toHaveBeenCalledWith(
+                'UPDATE todos SET status = ? WHERE id = ? AND user_id = ?',
+                ['done', '1', 1]
+            );
+        });
+
+        test('should update todo details', async () => {
+            mockPool.query.mockResolvedValue([{ affectedRows: 1 }]);
+
+            const response = await request(app)
+                .put('/api/todos/1')
+                .send({ details: 'Updated details' });
+
+            expect(response.status).toBe(200);
+        });
+
+        test('should update multiple fields at once', async () => {
+            mockPool.query.mockResolvedValue([{ affectedRows: 1 }]);
+
+            const response = await request(app)
+                .put('/api/todos/1')
+                .send({ text: 'New text', status: 'done', details: 'New details' });
+
+            expect(response.status).toBe(200);
+            expect(mockPool.query).toHaveBeenCalledWith(
+                'UPDATE todos SET text = ?, status = ?, details = ? WHERE id = ? AND user_id = ?',
+                ['New text', 'done', 'New details', '1', 1]
+            );
+        });
+
+        test('should reject update with no fields', async () => {
+            const response = await request(app)
+                .put('/api/todos/1')
+                .send({});
+
+            expect(response.status).toBe(400);
+            expect(response.body).toEqual({ error: 'No fields to update.' });
+            expect(mockPool.query).not.toHaveBeenCalled();
+        });
+
+        test('should return 404 when todo not found', async () => {
+            mockPool.query.mockResolvedValue([{ affectedRows: 0 }]);
+
+            const response = await request(app)
+                .put('/api/todos/999')
+                .send({ text: 'Updated text' });
+
+            expect(response.status).toBe(404);
+            expect(response.body).toEqual({ 
+                error: 'Todo not found or you do not have permission to update it.' 
+            });
+        });
+
+        test('should handle database errors during update', async () => {
+            mockPool.query.mockRejectedValue(new Error('Update failed'));
+
+            const response = await request(app)
+                .put('/api/todos/1')
+                .send({ text: 'Updated text' });
+
+            expect(response.status).toBe(500);
+            expect(response.body).toEqual({ error: 'Failed to update todo.' });
+        });
+    });        
     });
 });
